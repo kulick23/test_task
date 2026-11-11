@@ -127,10 +127,20 @@ function App() {
   }
   async function linkTelegram() {
     if (!supabase || role !== 'hr' || demo) return;
+    // Open synchronously inside the click handler so browsers don't block the
+    // Telegram deep link after the asynchronous Supabase request completes.
+    const telegramWindow = window.open('about:blank', '_blank');
+    if (telegramWindow) telegramWindow.opener = null;
     setBusy(true); setError('');
     const { data, error: linkError } = await supabase.functions.invoke('telegram', { body: { action: 'link' } });
-    if (linkError || !data?.url) setError('Не удалось создать ссылку. Проверьте настройки Telegram-бота.');
-    else window.open(data.url, '_blank', 'noopener,noreferrer');
+    if (linkError || !data?.url) {
+      telegramWindow?.close();
+      setError(linkError?.message || 'Функция не вернула ссылку. Проверьте настройки Telegram-бота.');
+    } else if (telegramWindow) {
+      telegramWindow.location.href = data.url;
+    } else {
+      window.location.assign(data.url);
+    }
     setBusy(false);
   }
   function resetDemoCheckin(item: Checkin) {
