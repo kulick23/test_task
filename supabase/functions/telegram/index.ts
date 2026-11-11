@@ -7,10 +7,15 @@ const botUsername = Deno.env.get('TELEGRAM_BOT_USERNAME') ?? '';
 const telegramSecret = Deno.env.get('TELEGRAM_WEBHOOK_SECRET') ?? '';
 const notifySecret = Deno.env.get('CHECKIN_WEBHOOK_SECRET') ?? '';
 const admin = url && serviceKey ? createClient(url, serviceKey, { auth: { persistSession: false } }) : null;
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
+};
 
 const json = (data: unknown, status = 200) => new Response(JSON.stringify(data), {
   status,
-  headers: { 'content-type': 'application/json; charset=utf-8' },
+  headers: { 'content-type': 'application/json; charset=utf-8', ...corsHeaders },
 });
 
 async function hash(value: string) {
@@ -98,6 +103,7 @@ async function notifyCheckin(req: Request, body: any) {
 }
 
 Deno.serve(async req => {
+  if (req.method === 'OPTIONS') return new Response(null, { status: 204, headers: corsHeaders });
   if (req.method !== 'POST') return json({ error: 'POST required' }, 405);
   if (!url || !serviceKey || !botToken) return json({ error: 'Function is not configured' }, 503);
   try {
