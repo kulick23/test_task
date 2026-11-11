@@ -127,21 +127,29 @@ function App() {
   }
   async function linkTelegram() {
     if (!supabase || role !== 'hr' || demo) return;
-    // Open synchronously inside the click handler so browsers don't block the
-    // Telegram deep link after the asynchronous Supabase request completes.
-    const telegramWindow = window.open('about:blank', '_blank');
-    if (telegramWindow) telegramWindow.opener = null;
     setBusy(true); setError('');
-    const { data, error: linkError } = await supabase.functions.invoke('telegram', { body: { action: 'link' } });
-    if (linkError || !data?.url) {
-      telegramWindow?.close();
-      setError(linkError?.message || 'Функция не вернула ссылку. Проверьте настройки Telegram-бота.');
-    } else if (telegramWindow) {
-      telegramWindow.location.href = data.url;
-    } else {
-      window.location.assign(data.url);
+    try {
+      const { data, error: linkError } = await supabase.functions.invoke('telegram', { body: { action: 'link' } });
+      if (linkError) {
+        let message = linkError.message;
+        const response = linkError.context;
+        if (response instanceof Response) {
+          try {
+            const body = await response.clone().json();
+            if (typeof body?.error === 'string') message = body.error;
+          } catch { /* Keep the function error message. */ }
+        }
+        setError(message);
+      } else if (!data?.url) {
+        setError('Функция не вернула ссылку. Проверьте настройки Telegram-бота.');
+      } else {
+        window.location.assign(data.url);
+      }
+    } catch (linkError) {
+      setError(linkError instanceof Error ? linkError.message : 'Не удалось связаться с Telegram-функцией.');
+    } finally {
+      setBusy(false);
     }
-    setBusy(false);
   }
   function resetDemoCheckin(item: Checkin) {
     if (!demo) return;
